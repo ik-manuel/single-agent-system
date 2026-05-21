@@ -41,7 +41,7 @@ class DatabaseTool
     /**
      * Execute the database query
      */
-    public function execute(array $params): array
+    public function execute(array $params): string
     {
         try {
             $query = DB::table('complaints');

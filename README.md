@@ -1,58 +1,82 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Single Agent System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A ReAct-pattern AI agent built with Laravel and Qwen3-32b via Groq.
+The agent autonomously decides which tools to use, executes them, 
+observes results, and loops until it can produce a final answer — 
+without any hardcoded routing logic.
 
-## About Laravel
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Architecture
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+POST /api/agent
+       │
+       ▼
+AgentController        → validates input, handles errors
+       │
+       ▼
+AgentService           → ReAct loop (Thought → Action → Observe)
+       │
+       ▼
+ToolRunnerService      → routes tool name to implementation
+       │
+  ┌────┼────┐
+  ▼    ▼    ▼
+Calc Search  DB        → execute, return string result to LLM
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## How the ReAct Loop Works
 
-## Learning Laravel
+1. User query enters the loop with a system prompt and tool definitions
+2. LLM reasons about what information it needs (Thought)
+3. LLM outputs a tool call request in JSON (Action)  
+4. Application executes the tool and appends result to history (Observe)
+5. LLM reads the result and decides: call another tool or give final answer
+6. Loop exits on final answer or max iterations (safety guard)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Tools
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| Tool | Description |
+|---|---|
+| `calculator` | Evaluates arithmetic expressions safely |
+| `web_search` | Searches for current information (mock) |
+| `database_tool` | Queries complaints by category, urgency, status |
 
-## Agentic Development
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Engineering Decisions
 
-```bash
-composer require laravel/boost --dev
+**Model:** Initially used `llama-3.3-70b-versatile` on Groq. During testing,
+this model produced inconsistent tool-calling behaviour — falling back to 
+XML-style function tags instead of JSON when multiple tools were registered,
+causing 400 errors on every tool invocation. Switched to `qwen/qwen3-32b` 
+which has stronger function-calling fine-tuning. All test cases passed 
+consistently after the switch.
 
-php artisan boost:install
-```
+**Mock search:** The SearchTool uses keyword tokenization (not full-string 
+matching) to reliably match agent queries against mock data regardless of 
+phrasing variation.
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+**Safety:** Max iterations guard prevents infinite loops. Tool execution 
+errors are caught and returned as strings so the agent can reason about 
+failures rather than crash.
 
-## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Sample Requests
 
-## Code of Conduct
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Calculator
+POST /api/agent
+{ "query": "What is 18 percent of 250000?" }
 
-## Security Vulnerabilities
+### Database
+POST /api/agent  
+{ "query": "Show me all high urgency complaints" }
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Multi-step (search + calculator)
+POST /api/agent
+{ "query": "What is 15 percent of the average software engineer salary in Lagos?" }
 
-## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Stack
+- Laravel 13
+- Groq API (qwen/qwen3-32b)
+- PHP 8.4

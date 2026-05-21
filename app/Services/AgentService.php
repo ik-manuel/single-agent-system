@@ -127,7 +127,7 @@ PROMPT;
                 return [
                     'answer'          => $response['content'],
                     'tokens'          => $totalTokens,
-                    'tool_used'       => $toolUsed,
+                    'tools_used'      => $toolUsed,
                     'iterations_used' => $round,
                     'round'           => $round ."/". $this->maxIterations,
                 ];
@@ -174,7 +174,7 @@ PROMPT;
         return  [
             'answer'          => $fallback,
             'tokens'          => $totalTokens,
-            'tool_used'       => $toolUsed,
+            'tools_used'      => $toolUsed,
             'iterations_used' => $round,
             'round'           => $round ."/". $this->maxIterations,
         ];
