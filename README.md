@@ -7,7 +7,7 @@ without any hardcoded routing logic.
 
 
 ## Architecture
-
+```
 POST /api/agent
        │
        ▼
@@ -22,6 +22,7 @@ ToolRunnerService      → routes tool name to implementation
   ┌────┼────┐
   ▼    ▼    ▼
 Calc Search  DB        → execute, return string result to LLM
+```
 
 ## How the ReAct Loop Works
 
